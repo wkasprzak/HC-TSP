@@ -75,7 +75,6 @@ void traditionalGreedyTSP(std::vector<City>& cities, double batteryCapacity, int
         totalDistance += ecoWasteFactor;
 
     std::clog << "Distance: " << totalDistance << std::endl;
-
 }
 
 void randomisedGreedyTSP(std::vector<City>& cities, double batteryCapacity, int ecoWasteFactor) {
@@ -138,21 +137,17 @@ void randomisedGreedyTSP(std::vector<City>& cities, double batteryCapacity, int 
         totalDistance += ecoWasteFactor;
 
     std::clog << "Distance: " << totalDistance << std::endl;
-
 }
 
 void bruteForceTSP(std::vector<City>& cities, std::vector<std::vector<double>> citiesGraph, double batteryCapacity, int ecoWasteFactor) {
     
     int numberOfCities = cities.size();
-    int currentCity = 0;
 
     std::vector<int> answerRoad;
     std::vector<int> minRoad;
 
     double minCost = DBL_MAX;
-    double answerEcoFootprint = DBL_MAX;
     double currentBatteryCapacity = batteryCapacity;
-    double totalDistance = 0.0;
     
     std::vector<int> order(numberOfCities);
     for (int i = 0; i < numberOfCities; i++)
@@ -202,7 +197,7 @@ std::vector<int> generateRandomTour(int numberOfCities) {
     return tour;
 }
 
-double checkEcoWaste( std::vector<std::vector<double>> citiesGraph, std::vector<int>& tour, int numberOfCities, double batteryCapacity, int ecoWasteFactor) {
+double checkEcoWaste(std::vector<std::vector<double>> citiesGraph, const std::vector<int>& tour, int numberOfCities, double batteryCapacity, int ecoWasteFactor) {
     double totalDistance = 0.0;
     double ecologicalFootprint = 0.0;
     double batteryLevel = batteryCapacity;
@@ -211,7 +206,6 @@ double checkEcoWaste( std::vector<std::vector<double>> citiesGraph, std::vector<
 
         totalDistance += citiesGraph[tour[i]][tour[i + 1]];
         batteryLevel -= citiesGraph[tour[i]][tour[i + 1]];
-
         if (batteryLevel < 0) {
             ecologicalFootprint += ecoWasteFactor; 
             batteryLevel = batteryCapacity;
@@ -228,40 +222,60 @@ double checkEcoWaste( std::vector<std::vector<double>> citiesGraph, std::vector<
     return totalDistance + ecologicalFootprint;
 }
 
-void tabuSearchTSP(std::vector<City>& cities, std::vector<std::vector<double>> citiesGraph, double batteryCapacity, int ecoWasteFactor) {
+void tabuSearchTSP(const std::vector<City>& cities, std::vector<std::vector<double>> citiesGraph, double batteryCapacity, int ecoWasteFactor) {
 
     int tabuListSize = 5;
-    int maxIterations = 100;
+    int maxIterations = 1000;
     int numberOfCities = cities.size();
 
     std::vector<int> currentTour = generateRandomTour(numberOfCities);
     std::vector<int> bestTour = currentTour;
-    double bestTourEcoWaste = checkEcoWaste(citiesGraph, currentTour, numberOfCities, batteryCapacity, ecoWasteFactor);
-    std::set<std::vector<int>> tabuList;
+    std::vector<std::vector<int>> tabuList;
 
     for (int iteration = 0; iteration < maxIterations; ++iteration) {
-        double currentTourEcoWaste = checkEcoWaste(citiesGraph, currentTour, numberOfCities, batteryCapacity, ecoWasteFactor);
+        std::vector <std::vector<int>> neighborhood;
+
         for (int i = 0; i < numberOfCities - 1; ++i) {
             for (int j = i + 1; j < numberOfCities; ++j) {
-                std::swap(currentTour[i], currentTour[j]);
-                double newTourEcoWaste = checkEcoWaste(citiesGraph, currentTour, numberOfCities, batteryCapacity, ecoWasteFactor);
+                std::vector<int> neighbor = currentTour;
+                std::swap(neighbor[i], neighbor[j]);
+                neighborhood.push_back(neighbor);
+            }
+        }
 
-                if (tabuList.find(currentTour) == tabuList.end() && newTourEcoWaste < currentTourEcoWaste) {
-                    currentTourEcoWaste = newTourEcoWaste;
-                    if (newTourEcoWaste < bestTourEcoWaste) {
-                        bestTour = currentTour;
-                        bestTourEcoWaste = newTourEcoWaste;
-                    }
-                } else {
-                    std::swap(currentTour[i], currentTour[j]);
+        std::vector<int> bestNeighbor;
+        double minNeighborEcoWaste = DBL_MAX;
+
+        for (const auto& neighbor : neighborhood) {
+            if (find_if(tabuList.begin(), tabuList.end(), [&neighbor](const auto& element) {
+                return element == neighbor;
+            }) == tabuList.end()) {
+                double neighborEcoWaste = checkEcoWaste(citiesGraph, neighbor, numberOfCities, batteryCapacity,
+                                                        ecoWasteFactor);
+                if (neighborEcoWaste <= minNeighborEcoWaste) {
+                    minNeighborEcoWaste = neighborEcoWaste;
+                    bestNeighbor = neighbor;
                 }
             }
         }
 
-        tabuList.insert(currentTour);
-        if (tabuList.size() > tabuListSize)
-            tabuList.erase(tabuList.begin());
+        if (!bestNeighbor.empty()) {
+            currentTour = bestNeighbor;
+            tabuList.push_back(currentTour);
+            if (tabuList.size() > tabuListSize) {
+                tabuList.erase(tabuList.begin());
+            }
+
+            double minEcoWaste = checkEcoWaste(citiesGraph, bestTour, numberOfCities, batteryCapacity, ecoWasteFactor);
+            double currentTourEcoWaste = checkEcoWaste(citiesGraph, currentTour, numberOfCities, batteryCapacity,
+                                                       ecoWasteFactor);
+            if (currentTourEcoWaste < minEcoWaste) {
+                bestTour = currentTour;
+            }
+        }
     }
+
+    double bestTourEcoWaste = checkEcoWaste(citiesGraph, bestTour, numberOfCities, batteryCapacity, ecoWasteFactor);
 
     std::clog << "Optimized Tour: ";
     for (int city : bestTour) {
@@ -283,98 +297,109 @@ int main() {
     // Opening file and creating objects
     nlohmann::json dataFromFile;
     std::vector<City> cities;
-        
-    std::clog << "Would you like to generate data and use it? (y/n) " << std::endl;
-    std::cin >> option;
-    switch(option) {
-        case 'y':
-        case 'Y':
+    for(int i = 4; i < 5; i++) {
+        for(int j = 0; j < 5; j++) {
             unsigned int n;
-            int leftConstraint, rightConstraint;
+            int leftConstraint = 0, rightConstraint = 1000;
             DataGenerator generator;
-            std::clog << "\nPlease enter the data in order: \nFile name, number of cities, left constraint, right constraint" << std::endl;
-            std::cin >> fileName >> n >> leftConstraint >> rightConstraint;
-            generator.generateData(fileName, n, leftConstraint, rightConstraint);
-            nameOfFile = "./data/" + fileName + ".json";
+            //std::clog << "\nPlease enter the data in order: \nFile name, number of cities, left constraint, right constraint" << std::endl;
+            //std::cin >> fileName >> n >> leftConstraint >> rightConstraint;
+            generator.generateData("data" + std::to_string(i) + "_" + std::to_string(j+1), i, leftConstraint, rightConstraint);
+            nameOfFile = "./data/data" + std::to_string(i) + "_" + std::to_string(j+1) + ".json";
             dataFile.open(nameOfFile);
-        break;
-        case 'n':
-        case 'N':
-            std::clog << "\nWhat file would you like to use?" << std::endl;
-            std::cin >> fileName;
-            nameOfFile = "./data/" + fileName + ".json";
-            dataFile.open(nameOfFile);
-        break;
-        default:
-            std::clog << "Choice error" << std::endl;
-            return 1;
+            std::cout << "Udalo sie " + std::to_string(i) + "." + std::to_string(j) + "\n";
+
+            // Importing data
+            dataFile >> dataFromFile;
+            dataFile.close();
+            for (const auto& oneCity : dataFromFile) {
+                City city(oneCity["id"], oneCity["x"], oneCity["y"]);
+                cities.push_back(city);
+            }
+
+            for (const City& city : cities)
+                std::clog << "City: " << city.getId() << " x = " << city.getX() << " y = " << city.getY() << std::endl;
+
+
+            // Printing cities
+//            std::clog << "\nWould you like to see the cities? (y/n) " << std::endl;
+//            std::cin >> option;
+//            if (option == 'y')
+
+            // Variables needed for TSP
+            std::vector<std::vector<double>> citiesGraph(cities.size(), std::vector<double>(cities.size()));
+            int ecoWasteFactor = cities.size();
+            double batteryCapacity = 0;
+
+            // Generating battery capacity
+            for (int i = 0; i < cities.size(); i++)
+                for (int j = 0; j < cities.size(); j++)
+                    if (i != j)
+                        citiesGraph[i][j] = sqrt(pow((cities.at(i).getX() - cities.at(j).getX()), 2) + pow((cities.at(i).getY() - cities.at(j).getY()), 2));
+                    else
+                        citiesGraph[i][j] = 0;
+
+            for (int i = 0; i < citiesGraph.size(); i++) {
+                for (int j = 0; j < citiesGraph[i].size(); j++)
+                    std::clog << citiesGraph[i][j] << "\t";
+                std::clog << std::endl;
+            }
+
+            for (int i = 0; i < citiesGraph[0].size(); i++)
+                batteryCapacity += citiesGraph[0][i];
+            batteryCapacity = ceil(batteryCapacity * 0.3);
+
+            // USUNĄĆ !!!!
+            //batteryCapacity = 25;
+
+            // Algorithms
+            std::chrono::steady_clock::time_point beginG1 = std::chrono::steady_clock::now();
+            traditionalGreedyTSP(cities, batteryCapacity, ecoWasteFactor);
+            std::chrono::steady_clock::time_point endG1 = std::chrono::steady_clock::now();
+            std::clog << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (endG1 - beginG1).count() << "[ns]" << std::endl;
+
+            std::chrono::steady_clock::time_point beginG2 = std::chrono::steady_clock::now();
+            randomisedGreedyTSP(cities, batteryCapacity, ecoWasteFactor);
+            std::chrono::steady_clock::time_point endG2 = std::chrono::steady_clock::now();
+            std::clog << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (endG2 - beginG2).count() << "[ns]" << std::endl;
+
+            std::chrono::steady_clock::time_point beginBF = std::chrono::steady_clock::now();
+            bruteForceTSP(cities, citiesGraph, batteryCapacity, ecoWasteFactor);
+            std::chrono::steady_clock::time_point endBF = std::chrono::steady_clock::now();
+            std::clog << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (endBF - beginBF).count() << "[ns]" << std::endl;
+
+            std::chrono::steady_clock::time_point beginTS = std::chrono::steady_clock::now();
+            tabuSearchTSP(cities, citiesGraph, batteryCapacity, ecoWasteFactor);
+            std::chrono::steady_clock::time_point endTS = std::chrono::steady_clock::now();
+            std::clog << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (endTS - beginTS).count() << "[ns]" << std::endl;
+        }
     }
-    
-    if (!dataFile.is_open()) {
-        std::cerr << "Unable to open JSON file." << std::endl;
-        return 1;
-    }
+//
+//    std::clog << "Would you like to generate data and use it? (y/n) " << std::endl;
+//    std::cin >> option;
+//    switch(option) {
+//        case 'y':
+//        case 'Y':
+//
+//        break;
+//        case 'n':
+//        case 'N':
+//            std::clog << "\nWhat file would you like to use?" << std::endl;
+//            std::cin >> fileName;
+//            nameOfFile = "./data/" + fileName + ".json";
+//            dataFile.open(nameOfFile);
+//        break;
+//        default:
+//            std::clog << "Choice error" << std::endl;
+//            return 1;
+//    }
+//
+//    if (!dataFile.is_open()) {
+//        std::cerr << "Unable to open JSON file." << std::endl;
+//        return 1;
+//    }
 
-    // Importing data
-    dataFile >> dataFromFile;
-    dataFile.close();
-    for (const auto& oneCity : dataFromFile) {
-        City city(oneCity["id"], oneCity["x"], oneCity["y"]);
-        cities.push_back(city);
-    }
 
-    // Printing cities
-    std::clog << "\nWould you like to see the cities? (y/n) " << std::endl;
-    std::cin >> option;
-    if (option == 'y')
-        for (const City& city : cities)
-            std::clog << "City: " << city.getId() << " x = " << city.getX() << " y = " << city.getY() << std::endl;
 
-    // Variables needed for TSP
-    std::vector<std::vector<double>> citiesGraph(cities.size(), std::vector<double>(cities.size()));
-    int ecoWasteFactor = cities.size();
-    double batteryCapacity = 0;
-
-    // Generating battery capacity
-    for (int i = 0; i < cities.size(); i++)
-        for (int j = 0; j < cities.size(); j++)
-            if (i != j)
-                citiesGraph[i][j] = sqrt(pow((cities.at(i).getX() - cities.at(j).getX()), 2) + pow((cities.at(i).getY() - cities.at(j).getY()), 2));
-            else
-                citiesGraph[i][j] = 0;
-
-        for (int i = 0; i < citiesGraph.size(); i++) { 
-        for (int j = 0; j < citiesGraph[i].size(); j++) 
-            std::clog << citiesGraph[i][j] << "\t"; 
-        std::clog << std::endl; 
-    }
-    
-    for (int i = 0; i < citiesGraph[0].size(); i++)
-            batteryCapacity += citiesGraph[0][i];
-    batteryCapacity = ceil(batteryCapacity * 0.3);
-
-    // USUNĄĆ !!!!
-    //batteryCapacity = 25;
-
-    // Algorithms
-    std::chrono::steady_clock::time_point beginG1 = std::chrono::steady_clock::now();
-    traditionalGreedyTSP(cities, batteryCapacity, ecoWasteFactor);
-    std::chrono::steady_clock::time_point endG1 = std::chrono::steady_clock::now();
-    std::clog << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (endG1 - beginG1).count() << "[ns]" << std::endl;
-
-    std::chrono::steady_clock::time_point beginG2 = std::chrono::steady_clock::now();
-    randomisedGreedyTSP(cities, batteryCapacity, ecoWasteFactor);
-    std::chrono::steady_clock::time_point endG2 = std::chrono::steady_clock::now();
-    std::clog << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (endG2 - beginG2).count() << "[ns]" << std::endl;
-
-    std::chrono::steady_clock::time_point beginBF = std::chrono::steady_clock::now();
-    bruteForceTSP(cities, citiesGraph, batteryCapacity, ecoWasteFactor);
-    std::chrono::steady_clock::time_point endBF = std::chrono::steady_clock::now();
-    std::clog << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (endBF - beginBF).count() << "[ns]" << std::endl;
-
-    std::chrono::steady_clock::time_point beginTS = std::chrono::steady_clock::now();
-    tabuSearchTSP(cities, citiesGraph, batteryCapacity, ecoWasteFactor);
-    std::chrono::steady_clock::time_point endTS = std::chrono::steady_clock::now();
-    std::clog << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (endTS - beginTS).count() << "[ns]" << std::endl;
 
 }
