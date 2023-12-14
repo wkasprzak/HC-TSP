@@ -6,17 +6,18 @@
 #include <algorithm>
 #include <fstream>
 #include <random>
-#include <cmath>
+#include <chrono>
 
 void DataGenerator::generateData(const std::string& dataFile, unsigned int numberOfCities, int leftConstraint, int rightConstraint) {
 
     nlohmann::json dataArray;
+
     if (leftConstraint > rightConstraint)
         std::swap(leftConstraint, rightConstraint);
 
-    // Data generation must-haves
-    std::random_device seed;
-    std::mt19937 gen(seed());
+    // Use current time as a seed
+    auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    std::mt19937 gen(static_cast<unsigned>(seed));
     std::uniform_int_distribution<int> dist(leftConstraint, rightConstraint);
 
     // Generating data
