@@ -202,7 +202,7 @@ std::vector<int> generateRandomTour(int numberOfCities) {
 
 std::pair<double, std::vector<int>> tabuSearchTSP(const std::vector<City>& cities, std::vector<std::vector<double>> citiesGraph, double batteryCapacity, int ecoWasteFactor) {
 
-    int maxIterations = 100000;
+    int maxIterations = 1000;
     int numberOfCities = cities.size();
     int tabuListSize = numberOfCities;
 
@@ -266,7 +266,7 @@ std::pair<double, std::vector<int>> tabuSearchTSP(const std::vector<City>& citie
 
 int main() {
 
-    std::string outputFileName = "100k.csv";
+    std::string outputFileName = "ans.csv";
     std::ofstream outputFile(outputFileName, std::ios::app);
     if (!outputFile.is_open()) {
         std::cerr << "Cannot open file\n";
@@ -275,8 +275,8 @@ int main() {
 
     outputFile << "numberOfCities" << ";" << "method" << ";" << "iteration" << ";" << "time" << ";" << "ecoWaste" << std::endl;
 
-    for(int m = 10; m <= 30; m+=5) {
-        for (int p = 0; p < 5; p++) {
+    for(int m = 4; m <= 11; m++) {
+        for (int p = 0; p < 10; p++) {
 
             std::ifstream dataFile;
             std::ofstream answerFile;
@@ -292,11 +292,11 @@ int main() {
             std::vector<City> cities;
             int leftConstraint = 0, rightConstraint = 10000;
             DataGenerator generator;
-            std::clog << "Teraz mamy " << m << "_" << p << std::endl;
-            generator.generateData("100k" + std::to_string(m) + "_" + std::to_string(p + 1), m, leftConstraint,
+            //std::clog << "Teraz mamy " << m << "_" << p << std::endl;
+            generator.generateData("1k" + std::to_string(m) + "_" + std::to_string(p + 1), m, leftConstraint,
                                    rightConstraint);
-            nameOfFile = "./data/100k" + std::to_string(m) + "_" + std::to_string(p + 1) + ".json";
-            nameOfAnswerFile = "./solution/100k" + std::to_string(m) + "_" + std::to_string(p + 1) + ".json";
+            nameOfFile = "./data/data" + std::to_string(m) + "_" + std::to_string(p + 1) + ".json";
+            nameOfAnswerFile = "./solution/sol" + std::to_string(m) + "_" + std::to_string(p + 1) + ".json";
             answerFile.open(nameOfAnswerFile);
             dataFile.open(nameOfFile);
             if (!dataFile.is_open() || !answerFile.is_open()) {
@@ -332,18 +332,18 @@ int main() {
             int ecoWasteFactor = batteryCapacity;
 
             // Algorithms
-//            auto startBF = std::chrono::high_resolution_clock::now();
-//            std::pair<double, std::vector<int>> BF = bruteForceTSP(cities, citiesGraph, batteryCapacity,
-//                                                                   ecoWasteFactor);
-//            auto endBF = std::chrono::high_resolution_clock::now();
-//            auto durationBF = std::chrono::duration_cast<std::chrono::microseconds>(endBF - startBF).count();
-//            outputFile << m << ";" << "BruteForce" << ";" << p << ";" << durationBF << ";" << BF.first << std::endl;
-//            solutionData["Brute-force cost: "] = BF.first;
-//            solutionData["Brute-force road: "] = BF.second;
-//            solutionData["Brute-force time [microseconds]: "] = durationBF;
-//            std::for_each(BF.second.begin(), BF.second.end(), [](int element) {
-//                std::clog << element << " ";
-//            });
+            auto startBF = std::chrono::high_resolution_clock::now();
+            std::pair<double, std::vector<int>> BF = bruteForceTSP(cities, citiesGraph, batteryCapacity,
+                                                                   ecoWasteFactor);
+            auto endBF = std::chrono::high_resolution_clock::now();
+            auto durationBF = std::chrono::duration_cast<std::chrono::microseconds>(endBF - startBF).count();
+            outputFile << m << ";" << "BruteForce" << ";" << p << ";" << durationBF << ";" << BF.first << std::endl;
+            solutionData["Brute-force cost: "] = BF.first;
+            solutionData["Brute-force road: "] = BF.second;
+            solutionData["Brute-force time [microseconds]: "] = durationBF;
+            std::for_each(BF.second.begin(), BF.second.end(), [](int element) {
+                std::clog << element << " ";
+            });
 
             auto startG1 = std::chrono::steady_clock::now();
             std::pair<double, std::vector<int>> G1 = traditionalGreedyTSP(cities, batteryCapacity, ecoWasteFactor);
