@@ -36,6 +36,6 @@ void DataGenerator::generateData(const std::string& dataFile, unsigned int numbe
         std::cerr << "Unable to open JSON file." << std::endl;
         return;
     }
-    file << dataArray.dump(4);
+    file << dataArray.dump(3);
     file.close();
 }
