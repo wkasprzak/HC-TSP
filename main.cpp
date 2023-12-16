@@ -293,7 +293,7 @@ int main() {
             int leftConstraint = 0, rightConstraint = 10000;
             DataGenerator generator;
             //std::clog << "Teraz mamy " << m << "_" << p << std::endl;
-            generator.generateData("1k" + std::to_string(m) + "_" + std::to_string(p + 1), m, leftConstraint,
+            generator.generateData("data" + std::to_string(m) + "_" + std::to_string(p + 1), m, leftConstraint,
                                    rightConstraint);
             nameOfFile = "./data/data" + std::to_string(m) + "_" + std::to_string(p + 1) + ".json";
             nameOfAnswerFile = "./solution/sol" + std::to_string(m) + "_" + std::to_string(p + 1) + ".json";
